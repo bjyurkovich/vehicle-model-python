@@ -25,7 +25,13 @@ class Driver(object):
         self.v_d = ((self.k_d * v_err) - self.v_d) / self.delta_t
 
         alpha = v_p + self.v_i + self.v_d
-        beta = -(v_p + self.v_i + self.v_d)
+        beta = alpha
+
+        # Saturate I term
+        if self.v_i > 0.75:
+            self.v_i = 0.75
+        elif self.v_i < -0.75:
+            self.v_i = -0.75
 
         if alpha >= 1:
             self.alpha = 1
@@ -44,5 +50,7 @@ class Driver(object):
 
         return {
             "alpha": self.alpha,
-            "beta": self.beta
+            "beta": self.beta,
+            "v_p": v_p,
+            "v_i": self.v_i
         }
