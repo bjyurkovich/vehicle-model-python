@@ -2,6 +2,7 @@ import numpy as np
 import scipy.io as spio
 import matplotlib
 import matplotlib.pyplot as plt
+import sys
 
 from driver import Driver
 from controller import Controller
@@ -17,9 +18,9 @@ from rear_wheels import RearWheels
 delta_t = 1
 vehicle_mass = 3000 * 0.453592  # in kg
 
-k_p = 2.3
-k_i = 0.6
-k_d = 2
+k_p = 0.1
+k_i = 0.03  # 0.6
+k_d = 0  # 2
 
 c_drag = 0.24
 frontal_area = 3.5
@@ -60,9 +61,11 @@ front_brake_torque_out = []
 rear_brake_torque_out = []
 alpha = []
 beta = []
+v_p = []
+v_i = []
 
 for v in v_cyc:
-    driver.compute_step(v, vehicle.velocity)
+    driver_out = driver.compute_step(v, vehicle.velocity)
 
     # compute necessary battery power
     power_req = driver.alpha * battery.compute_max_power()
@@ -74,10 +77,10 @@ for v in v_cyc:
     em.compute_step(battery.p_pack, em_gearbox.em_force_w)
     em_torque_out.append(em.em_torque)
 
-    em_gearbox.compute_step(em.em_torque, front_wheels.force_at_wheel)
-
     rear_brakes.compute_step(rear_wheels.wheel_torque, driver.beta)
     front_brakes.compute_step(front_wheels.wheel_torque, driver.beta)
+
+    em_gearbox.compute_step(em.em_torque, front_brakes.front_brake_w)
 
     front_wheels.compute_step(
         em_gearbox.torque_out / 2, front_brakes.brake_torque, vehicle.velocity)
@@ -97,6 +100,8 @@ for v in v_cyc:
     rear_brake_torque_out.append(rear_brakes.brake_torque)
     alpha.append(driver.alpha)
     beta.append(driver.beta)
+    v_p.append(driver_out['v_p'])
+    v_i.append(driver_out['v_i'])
     v_out.append(vehicle_data['velocity'])
 
 
@@ -137,5 +142,32 @@ fig1 = plt.figure()
 plt.plot(t_cyc, v_cyc, 'b')
 plt.plot(t_cyc, v_out, 'r--')
 
+fig7 = plt.figure(figsize=(8, 9))
+
+veh_speed = plt.subplot(511)
+veh_speed.set_title('Vehicle speed')
+veh_speed.plot(t_cyc, v_cyc, 'b')
+veh_speed.plot(t_cyc, v_out, 'r--')
+veh_speed.plot(t_cyc, v_cyc - v_out, 'g')
+
+acc_brake_cmd = plt.subplot(512, sharex=veh_speed)
+acc_brake_cmd.set_title('Throttle / Brake command')
+acc_brake_cmd.plot(t_cyc, alpha, 'b')
+acc_brake_cmd.plot(t_cyc, beta, 'r--')
+
+power_req = plt.subplot(513, sharex=veh_speed)
+power_req.set_title('Battery power out')
+power_req.plot(t_cyc, em_torque_out)
+
+
+wheel_torque = plt.subplot(514, sharex=veh_speed)
+wheel_torque.set_title('Wheel Torque')
+wheel_torque.plot(t_cyc, front_wheel_torque_out, 'b')
+wheel_torque.plot(t_cyc, rear_wheel_torque_out, 'r--')
+
+driver_pi = plt.subplot(515, sharex=veh_speed)
+driver_pi.set_title('Driver PI')
+driver_pi.plot(t_cyc, v_p, 'b')
+driver_pi.plot(t_cyc, v_i, 'r')
 
 plt.show()
